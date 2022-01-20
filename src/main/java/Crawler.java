@@ -1,3 +1,7 @@
+import com.amazonaws.services.lambda.runtime.Context;
+import com.amazonaws.services.lambda.runtime.RequestHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -8,161 +12,140 @@ import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeBodyPart;
 import javax.mail.internet.MimeMessage;
 import javax.mail.internet.MimeMultipart;
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Properties;
+import java.io.*;
+import java.util.*;
 import java.util.stream.Collectors;
 
-public class Crawler {
+public class Crawler implements RequestHandler<Map<String,String>, Void> {
+    private static final Logger logger = LoggerFactory.getLogger(Crawler.class);
 
-    public void getPageLinks(String URL) {
 
-        try {
-
-            //2. Fetch the HTML code
-            Document document = Jsoup.connect(URL).get();
-            //3. Parse the HTML to extract links to other URLs
-            Elements elements = document.getElementsByClass("pb-4 mb-2 col-12  col-sm-6 col-lg-4");
-            BufferedWriter writer = new BufferedWriter(new FileWriter("output.txt"));
-            List<Plan> plans = new ArrayList<Plan>();
-            for(Element ele : elements){
-                Plan plan = new Plan();
-
-                Elements planNameEle = ele.getElementsByClass("card-title h4 font-weight-bold text-capitalize");
-                plan.setPlanName(planNameEle.text());
-
-                Elements configurationEle = ele.getElementsByClass("list-unstyled list-inline mb-2 text-sm");
-                plan.setConfiguration(configurationEle.text());
-
-                Elements priceEle = ele.getElementsByClass("font-weight-bold  mb-1 text-md");
-                plan.setPrice(priceEle.text());
-
-                Elements available = ele.getElementsByClass("col-12  my-2");
-                String availablity = available.text();
-                if(availablity.toLowerCase().contains("contact")){
-                    plan.setAvailable(false);
-                }else{
-                    plan.setAvailable(true);
-                }
-                plans.add(plan);
-
+    public void getPageLinks(Map<String,String> apartment2URL) {
+        String data = "test";
+        setupEmail();
+        for(String apartmentName : apartment2URL.keySet()){
+            if (apartmentName.equals("Trio")){
+                crawlTrio(apartment2URL.get(apartmentName));
             }
-            writer.close();
+        }
+    }
 
-            // Assuming you are sending email from through gmails smtp
-            String host = "smtp.gmail.com";
+    private void crawlTrio(String url){
+        try {
+            //2. Fetch the HTML code
+            Plan trioPlan = new TrioPlan();
+            String boxClass = "pb-4 mb-2 col-12  col-sm-6 col-lg-4";
+            String planNameClass = "card-title h4 font-weight-bold text-capitalize";
+            String configurationClass = "list-unstyled list-inline mb-2 text-sm";
+            String priceClass = "font-weight-bold  mb-1 text-md";
+            Map<String,Plan> currentPlanMap = trioPlan.crawl(url, boxClass, planNameClass, configurationClass, priceClass);
 
-            // Get system properties
-            Properties properties = System.getProperties();
 
-            // Setup mail server
-            properties.put("mail.smtp.host", host);
-            properties.put("mail.smtp.port", "465");
-            properties.put("mail.smtp.ssl.enable", "true");
-            properties.put("mail.smtp.auth", "true");
-            Session session = Session.getInstance(properties, new Authenticator() {
-                @Override
-                protected PasswordAuthentication getPasswordAuthentication() {
-                    return new PasswordAuthentication("wo111180611@gmail.com", "lzbpzcbscrfvigsa");
+            String ss = read();
+
+            boolean changed = false;
+            StringBuilder changedContent = new StringBuilder();
+            Map<String,Plan> planFromFile = Plan.toPlan(ss);
+            for(String currentName : plans.keySet()){
+                if(!planFromFile.containsKey(currentName)){
+                    changed = true;
+                    changedContent.append(plans.get(currentName).toString()).append("\n");
+                }else{
+                    Plan old = planFromFile.get(currentName);
+                    Plan newPlan = plans.get(currentName);
+                    if(!old.getPrice().equals(newPlan.getPrice())){
+                        changed = true;
+                        changedContent.append(newPlan.toString());
+                    }
                 }
-            });
-            Message message = new MimeMessage(session);
-            message.setFrom(new InternetAddress("wo111180611@gmail.com"));
-            message.setRecipients(
-                    Message.RecipientType.TO, InternetAddress.parse("hanyu20703@gmail.com"));
-            message.setSubject("Mail Subject");
+            }
+            if(changed == true) {
+                MimeBodyPart mimeBodyPart = new MimeBodyPart();
+                mimeBodyPart.setContent(changedContent.toString(), "text/html; charset=utf-8");
 
-            String data = plans.stream().map(Plan::toString).collect(Collectors.joining("\n"));;
+                Multipart multipart = new MimeMultipart();
+                multipart.addBodyPart(mimeBodyPart);
 
-            System.out.println(data);
+                message.setContent(multipart);
+//                if(changedContent.toString().contains("Available")){
+//                    message.setSubject("Apartment is gone!");
+//
+//                } else {
+                message.setSubject("New Apartment Available!");
 
-            MimeBodyPart mimeBodyPart = new MimeBodyPart();
-            mimeBodyPart.setContent(data, "text/html; charset=utf-8");
+                //}
+                System.out.println(changedContent.toString());
 
-            Multipart multipart = new MimeMultipart();
-            multipart.addBodyPart(mimeBodyPart);
+                Transport.send(message);
 
-            message.setContent(multipart);
+                File myObj = new File("/tmp/result.json");
+                myObj.delete();
+                write(data);
+            }
 
-            Transport.send(message);
 
         } catch (Exception e) {
-            System.err.println("For '" + URL + "': " + e.getMessage());
+            e.printStackTrace();
         }
-
     }
 
+    private void setupEmail(){
+        String host = "smtp.gmail.com";
+
+        // Get system properties
+        Properties properties = System.getProperties();
+
+        // Setup mail server
+        properties.put("mail.smtp.host", host);
+        properties.put("mail.smtp.port", "465");
+        properties.put("mail.smtp.ssl.enable", "true");
+        properties.put("mail.smtp.auth", "true");
+        Session session = Session.getInstance(properties, new Authenticator() {
+            @Override
+            protected PasswordAuthentication getPasswordAuthentication() {
+                return new PasswordAuthentication("wo111180611@gmail.com", "lzbpzcbscrfvigsa");
+            }
+        });
+        Message message = new MimeMessage(session);
+        message.setFrom(new InternetAddress("wo111180611@gmail.com"));
+        message.addRecipients(
+                Message.RecipientType.TO, InternetAddress.parse("hanyu20703@gmail.com"));
+        message.addRecipients(
+                Message.RecipientType.TO, InternetAddress.parse("lx.hikari@gmail.com"));
+        message.setSubject("Mail Subject");
+    }
+
+
+
+    private void write(String data) throws Exception{
+        Writer writer = null;
+        writer = new BufferedWriter(new OutputStreamWriter(
+                new FileOutputStream("/tmp/result.json"), "utf-8"));
+        writer.write(data);
+        writer.close();
+    }
+
+    private String read() throws Exception{
+        File myObj = new File("/tmp/result.json");
+        if(!myObj.exists()){
+            return "";
+        }
+        Scanner myReader = new Scanner(myObj);
+        StringBuilder sb = new StringBuilder();
+        while (myReader.hasNextLine()) {
+            sb.append(myReader.nextLine());
+            sb.append("\n");
+        }
+        myReader.close();
+        return sb.toString();
+    }
+
+
+    public String handleRequest(Map<String, String> s, Context context) {
+        return new Crawler().getPageLinks(s);
+    }
 
     public static void main(String[] args) {
-        //1. Pick a URL from the frontier
-        new Crawler().getPageLinks("https://www.trioaptspasadena.com/floorplans");
-    }
-}
-
-class Plan {
-    String planName;
-    String configuration;
-    String price;
-    boolean available;
-
-
-    public String getPlanName() {
-        return planName;
-    }
-
-    public void setPlanName(String planName) {
-        this.planName = planName;
-    }
-
-    public String getConfiguration() {
-        return configuration;
-    }
-
-    public void setConfiguration(String configuration) {
-        String[] split = configuration.split("\\s+");
-        StringBuilder planConfig = new StringBuilder();
-        for(int i = 0; i < split.length - 1; i++){
-            if (split[i+1].contains("Sq")){
-                break;
-            } else{
-                planConfig.append(split[i]).append(" ");
-            }
-        }
-        this.configuration = planConfig.toString().trim();
-    }
-
-    public String getPrice() {
-        return price;
-    }
-
-    public void setPrice(String price) {
-        String finalPrice = "";
-        if(price.startsWith("Call")){
-            finalPrice = "Not Available";
-        } else{
-            finalPrice = price.substring(price.indexOf("$"), price.indexOf("/"));
-        }
-        this.price = finalPrice.trim();
-    }
-
-    public boolean isAvailable() {
-        return available;
-    }
-
-    public void setAvailable(boolean available) {
-        this.available = available;
-    }
-
-    @Override
-    public String toString() {
-        return "Plan{" +
-                "" + planName + '\'' +
-                ", " + configuration + '\'' +
-                ", " + price + '\'' +
-                "}";
+        new Crawler().handleRequest("https://www.trioaptspasadena.com/floorplans", null);
     }
 }
