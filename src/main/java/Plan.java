@@ -31,8 +31,8 @@ public class Plan {
     @Override
     public String toString() {
         return "Plan{" +
-                planName + "," +
-                configuration + ',' +
+                planName + "|" +
+                configuration + '|' +
                 price+
                 "}";
     }

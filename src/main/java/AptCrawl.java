@@ -1,4 +1,5 @@
 import java.io.*;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.stream.Collectors;
@@ -9,11 +10,17 @@ public interface AptCrawl {
 
     Map<String, Plan> crawl(String url);
 
-    String processPlanName(String planName);
+    default String processPlanName(String planName){
+        return planName;
+    }
 
-    String processConfiguration(String configuration);
+    default String processConfiguration(String configuration){
+        return configuration;
+    }
 
-    String processPrice(String price);
+    default String processPrice(String price){
+        return price;
+    }
 
     default String serialize(Map<String, Plan> map) {
         return map.values().stream().map(Plan::toString).collect(Collectors.joining("\n"));
@@ -37,7 +44,24 @@ public interface AptCrawl {
 
     }
 
-    Map<String, Plan> toPlan(String s);
+    default Map<String, Plan> toPlan(String s){
+        Map<String,Plan> res = new HashMap<>();
+        if(s.isEmpty()){
+            return res;
+        }
+        String[] planStrs = s.split("\\r?\\n|\\r");
+        for(String str : planStrs){
+            Plan plan = new Plan();
+            String[] parts = str.split("\\|");
+            plan.setPlanName(parts[0].substring(5));
+            plan.setConfiguration(parts[1]);
+            String price = null;
+            price = parts[2].substring(0, parts[2].length()-1);
+            plan.setPrice(price);
+            res.put(plan.getPlanName(), plan);
+        }
+        return res;
+    }
 
     default void write(String data) throws Exception {
         Writer writer = null;

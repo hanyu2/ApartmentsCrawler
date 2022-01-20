@@ -46,10 +46,6 @@ public class TrioAptCrawl implements AptCrawl{
         return map;
     }
 
-    @Override
-    public String processPlanName(String planName) {
-        return planName;
-    }
 
     @Override
     public String processConfiguration(String configuration) {
@@ -68,36 +64,14 @@ public class TrioAptCrawl implements AptCrawl{
     @Override
     public String processPrice(String price) {
         String finalPrice = "";
-        if(price.startsWith("Call")){
+        String cleanedPrice = price.replace(",", "");
+        if(cleanedPrice.startsWith("Call")){
             finalPrice = "Not Available";
         } else{
-            finalPrice = price.substring(price.indexOf("$"), price.indexOf("/"));
+            finalPrice = cleanedPrice.substring(price.indexOf("$"), price.indexOf("/"));
         }
+
         return finalPrice.trim();
     }
 
-    @Override
-    public Map<String, Plan> toPlan(String s) {
-        Map<String,Plan> res = new HashMap<>();
-        if(s.isEmpty()){
-            return res;
-        }
-        String[] planStrs = s.split("\\r?\\n|\\r");
-        for(String str : planStrs){
-            Plan plan = new Plan();
-            String[] parts = str.split(",");
-            plan.setPlanName(parts[0].substring(5));
-            plan.setConfiguration(parts[1]);
-            String price = null;
-            if(parts.length == 3){
-                price = parts[2].substring(0, parts[2].length()-1);
-            } else{
-                price = parts[2]+","+parts[3].substring(0, parts[3].length()-1);
-            }
-
-            plan.setPrice(price);
-            res.put(plan.getPlanName(), plan);
-        }
-        return res;
-    }
 }

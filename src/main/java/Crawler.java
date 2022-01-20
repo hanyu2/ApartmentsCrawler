@@ -8,6 +8,7 @@ import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeBodyPart;
 import javax.mail.internet.MimeMessage;
 import javax.mail.internet.MimeMultipart;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class Crawler implements RequestHandler<Map<String,String>, String> {
@@ -18,28 +19,41 @@ public class Crawler implements RequestHandler<Map<String,String>, String> {
         StringBuilder data = new StringBuilder();
         AptCrawl crawler;
         for(String apartmentName : apartment2URL.keySet()){
-
-            crawler = new TrioAptCrawl();
+            if(apartmentName.equals("Trio")){
+                crawler = new TrioAptCrawl();
+            } else if (apartmentName.equals("Amli")){
+                crawler = new AmliAptCrawl();
+            } else if (apartmentName.equals("Avila")){
+                crawler = new AvilaAptCrawl();
+            } else if (apartmentName.equals("CityPlace")){
+                crawler = new CityPlaceAptCrawl();
+            } else{
+                crawler = new HudsonAptCrawl();
+            }
             String url = apartment2URL.get(apartmentName);
 
             Map<String, Plan> currentPlanMap = crawler.crawl(url);
-            String trioInfo = crawler.findDiff(currentPlanMap);
-            if (trioInfo.length() != 0) {
-                data.append("Trio:\n");
-                data.append(trioInfo).append("\n");
+            String info = crawler.findDiff(currentPlanMap);
+            if (info.length() != 0) {
+                data.append(apartmentName).append(":").append("\n");
+                data.append(info).append("\n");
                 crawler.deleteFile();
                 crawler.write(crawler.serialize(currentPlanMap));
+                data.append("\n");
             }
         }
-        if(data.length() != 0){
+
+        if (data.length() != 0){
             sendEmail(data.toString());
+        } else{
+            logger.info("No Update!");
         }
         return data.toString();
     }
 
     private void sendEmail(String content) throws MessagingException {
         MimeBodyPart mimeBodyPart = new MimeBodyPart();
-        mimeBodyPart.setContent(content, "text/html; charset=utf-8");
+        mimeBodyPart.setContent(content, "text/plain");
 
         Multipart multipart = new MimeMultipart();
         multipart.addBodyPart(mimeBodyPart);
@@ -64,14 +78,14 @@ public class Crawler implements RequestHandler<Map<String,String>, String> {
         message.setFrom(new InternetAddress("wo111180611@gmail.com"));
         message.addRecipients(
                 Message.RecipientType.TO, InternetAddress.parse("hanyu20703@gmail.com"));
-        //message.addRecipients(
-         //       Message.RecipientType.TO, InternetAddress.parse("lx.hikari@gmail.com"));
+        message.addRecipients(
+                Message.RecipientType.TO, InternetAddress.parse("lx.hikari@gmail.com"));
         message.setSubject("Mail Subject");
 
         message.setContent(multipart);
-
-        message.setSubject("Apartment Updates!");
-
+        SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
+        String formatted = df.format(new Date());
+        message.setSubject("Apartment Updates! " + formatted);
 
         System.out.println(content.toString());
 
@@ -83,6 +97,10 @@ public class Crawler implements RequestHandler<Map<String,String>, String> {
     public static void main(String[] args) {
         Map<String, String> map = new HashMap<>();
         map.put("Trio","https://www.trioaptspasadena.com/floorplans");
+        map.put("Amli","https://www.amli.com/amli-old-pasadena/floorplans");
+        map.put("Avila", "https://www.liveavila.com/pasadena/avila/conventional/");
+        //map.put("CityPlace","https://www.liveatcityplace.com/floorplans");
+        map.put("Hudson","https://www.livethehudson.com/floorplans");
         new Crawler().handleRequest(map, null);
     }
 
