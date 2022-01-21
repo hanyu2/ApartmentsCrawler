@@ -1,7 +1,5 @@
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.mail.*;
 import javax.mail.internet.InternetAddress;
@@ -12,8 +10,6 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class Crawler implements RequestHandler<Map<String,String>, String> {
-    private static final Logger logger = LoggerFactory.getLogger(Crawler.class);
-
 
     public String getPageLinks(Map<String,String> apartment2URL) throws Exception {
         StringBuilder data = new StringBuilder();
@@ -45,10 +41,8 @@ public class Crawler implements RequestHandler<Map<String,String>, String> {
 
         if (data.length() != 0){
             sendEmail(data.toString());
-        } else{
-            logger.info("No Update!");
         }
-        return data.toString();
+        return "Scan finished!";
     }
 
     private void sendEmail(String content) throws MessagingException {
@@ -86,9 +80,8 @@ public class Crawler implements RequestHandler<Map<String,String>, String> {
         SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
         String formatted = df.format(new Date());
         message.setSubject("Apartment Updates! " + formatted);
-
-        System.out.println(content.toString());
-
+        System.out.println("Updates! ============");
+        System.out.println(content);
         Transport.send(message);
     }
 
