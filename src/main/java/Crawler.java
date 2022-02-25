@@ -12,9 +12,11 @@ import java.util.*;
 public class Crawler implements RequestHandler<Map<String,String>, String> {
 
     public String getPageLinks(Map<String,String> apartment2URL) throws Exception {
+
         StringBuilder data = new StringBuilder();
         AptCrawl crawler;
         for(String apartmentName : apartment2URL.keySet()){
+            System.out.println(apartmentName);
             if(apartmentName.equals("Trio")){
                 crawler = new TrioAptCrawl();
             } else if (apartmentName.equals("Amli")){
@@ -23,7 +25,13 @@ public class Crawler implements RequestHandler<Map<String,String>, String> {
                 crawler = new AvilaAptCrawl();
             } else if (apartmentName.equals("CityPlace")){
                 crawler = new CityPlaceAptCrawl();
-            } else{
+            } else if (apartmentName.equals("TheBrand")) {
+                crawler = new TheBrandCrawl();
+            } else if(apartmentName.equals("Camden")) {
+                crawler = new CamdenCrawl();
+            } else if(apartmentName.equals("Modera")) {
+                crawler = new ModeraCrawl();
+            } else {
                 crawler = new HudsonAptCrawl();
             }
             String url = apartment2URL.get(apartmentName);
@@ -89,11 +97,11 @@ public class Crawler implements RequestHandler<Map<String,String>, String> {
 
     public static void main(String[] args) {
         Map<String, String> map = new HashMap<>();
-        map.put("Trio","https://www.trioaptspasadena.com/floorplans");
+        //map.put("Trio","https://www.trioaptspasadena.com/floorplans");
         map.put("Amli","https://www.amli.com/amli-old-pasadena/floorplans");
-        map.put("Avila", "https://www.liveavila.com/pasadena/avila/conventional/");
+        //map.put("Avila", "https://www.liveavila.com/pasadena/avila/conventional/");
         //map.put("CityPlace","https://www.liveatcityplace.com/floorplans");
-        map.put("Hudson","https://www.livethehudson.com/floorplans");
+        //map.put("Hudson","https://www.livethehudson.com/floorplans");
         new Crawler().handleRequest(map, null);
     }
 
